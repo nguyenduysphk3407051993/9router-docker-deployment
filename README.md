@@ -25,27 +25,48 @@ API: `http://127.0.0.1:20128/v1`
 
 ---
 
-## 2) Kết nối OpenClaw <-> 9router trong Docker network chung
+## 2) Kết nối OpenClaw với 9Router
 
-Compose này tạo network dùng chung tên mặc định: `ai_stack`.
-Service `9router` có hostname nội bộ: `9router`.
-
-### Trường hợp OpenClaw chạy bằng Docker Compose khác
-
-Đảm bảo OpenClaw container join cùng network:
-
-```bash
-docker network connect ai_stack <openclaw_container_name>
-```
-
-Sau đó cấu hình OpenClaw dùng endpoint nội bộ:
+Để OpenClaw gọi model thông qua 9Router trong Docker, bạn cần cấu hình **2 biến môi trường ở phía OpenClaw**:
 
 ```bash
 OPENAI_BASE_URL=http://9router:20128/v1
 OPENAI_API_KEY=<api-key-tao-trong-dashboard-9router>
 ```
 
-> Dùng `9router` (hostname nội bộ) giúp ổn định hơn `localhost` trong cross-container traffic.
+- `OPENAI_BASE_URL=http://9router:20128/v1`: địa chỉ nội bộ Docker để OpenClaw gọi tới 9Router.
+- `OPENAI_API_KEY=<api-key-tao-trong-dashboard-9router>`: API key do 9Router tạo ra trong Dashboard.
+
+### Các bước thực hiện
+
+1. **Chạy 9Router trước**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Truy cập Dashboard 9Router** tại `https://9router.edutechnd.io.vn`, đăng nhập bằng `INITIAL_PASSWORD`.
+
+3. **Vào Settings → API Keys** trong Dashboard, tạo API key mới và copy lại.
+
+4. **Mở file `.env` của OpenClaw** (không phải `.env` của 9Router), thêm:
+
+   ```bash
+   OPENAI_BASE_URL=http://9router:20128/v1
+   OPENAI_API_KEY=<api-key-tao-trong-dashboard-9router>
+   ```
+
+5. **Restart OpenClaw** để nhận cấu hình mới:
+
+   ```bash
+   docker compose restart openclaw-gateway
+   ```
+
+### Lưu ý quan trọng
+
+- Hai dòng `OPENAI_BASE_URL` và `OPENAI_API_KEY` phải đặt **bên phía OpenClaw**, không phải bên 9Router.
+- API key phải được tạo trong Dashboard 9Router **sau khi 9Router đã chạy**.
+- Container OpenClaw và 9Router phải cùng chung mạng Docker `traefik-network` thì OpenClaw mới gọi được qua hostname `9router`.
 
 ---
 
