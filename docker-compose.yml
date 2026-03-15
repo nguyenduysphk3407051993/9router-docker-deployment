@@ -9,8 +9,8 @@ services:
     image: 9router-local:latest
     restart: unless-stopped
 
-    ports:
-      - "${NINE_ROUTER_PORT:-20128}:20128"
+    expose:
+      - "20128"
 
     environment:
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
@@ -24,7 +24,7 @@ services:
       API_KEY_SECRET: ${API_KEY_SECRET:-endpoint-proxy-api-key-secret}
       MACHINE_ID_SALT: ${MACHINE_ID_SALT:-endpoint-proxy-salt}
       REQUIRE_API_KEY: ${REQUIRE_API_KEY:-false}
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
 
       # Data + observability
       DATA_DIR: /app/data
@@ -32,8 +32,8 @@ services:
       OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED:-true}
 
       # URL contract (internal + external)
-      BASE_URL: ${BASE_URL:-http://9router:20128}
-      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://127.0.0.1:${NINE_ROUTER_PORT:-20128}}
+      BASE_URL: ${BASE_URL:-https://9router.edutechnd.io.vn}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://9router.edutechnd.io.vn}
       CLOUD_URL: ${CLOUD_URL:-https://9router.com}
       NEXT_PUBLIC_CLOUD_URL: ${NEXT_PUBLIC_CLOUD_URL:-https://9router.com}
 
@@ -43,11 +43,27 @@ services:
     volumes:
       - 9router_data:/app/data
 
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-network"
+      - "traefik.http.routers.9router.rule=Host(`9router.edutechnd.io.vn`)"
+      - "traefik.http.routers.9router.entrypoints=websecure"
+      - "traefik.http.routers.9router.tls=true"
+      - "traefik.http.routers.9router.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.9router.service=9router-svc"
+      - "traefik.http.services.9router-svc.loadbalancer.server.port=20128"
+      - "traefik.http.routers.9router.middlewares=9router-compress,9router-headers"
+      - "traefik.http.middlewares.9router-compress.compress=true"
+      - "traefik.http.middlewares.9router-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.9router-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.9router-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.9router-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.9router-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.9router-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.9router-headers.headers.referrerPolicy=no-referrer-when-downgrade"
+
     networks:
-      ai_stack:
-        aliases:
-          - 9router
-          - nine-router
+      - traefik-network
 
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:20128/v1/models >/dev/null 2>&1 || exit 1"]
@@ -57,9 +73,8 @@ services:
       start_period: 45s
 
 networks:
-  ai_stack:
-    name: ${DOCKER_SHARED_NETWORK:-ai_stack}
-    driver: bridge
+  traefik-network:
+    external: true
 
 volumes:
   9router_data:
